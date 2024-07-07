@@ -12,7 +12,7 @@ namespace Inventory_Service.Endpoints
                 var products = await dbContext.Products.ToListAsync();
                 return Results.Ok(products);
             });
-            app.MapGet("products/{id}", async (InventoryDbContext dbContext, int id) =>
+            app.MapGet("/products/{id}", async (InventoryDbContext dbContext, int id) =>
             {
                 var product = await dbContext.Products.FindAsync(id);
                 if (product == null)
@@ -21,7 +21,6 @@ namespace Inventory_Service.Endpoints
                 }
                 return Results.Ok(product);
             });
-            
         }
     }
 }
