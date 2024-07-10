@@ -1,4 +1,3 @@
-using Inventory_Service.Database_Operations;
 using Inventory_Service.Endpoints;
 using Inventory_Service.Models;
 using Inventory_Service.WorkerService;

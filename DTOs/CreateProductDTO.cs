@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Marketplace_API_Gateway.DTOs
+namespace Inventory_Service.DTOs
 {
     public record class CreateProductDTO
     {
@@ -9,6 +9,6 @@ namespace Marketplace_API_Gateway.DTOs
         public string? Description { get; set; }
 
         public required decimal Price { get; set; }
-        public int? PostedBy { get; set; }
+        public required int PostedBy { get; set; }
     }
 }

@@ -1,8 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
-using Inventory_Service.Database_Operations;
+using Inventory_Service.DTOs;
 using Inventory_Service.Models;
-using Marketplace_API_Gateway.DTOs;
 using Microsoft.EntityFrameworkCore;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -33,45 +32,66 @@ namespace Inventory_Service.WorkerService
                 byte[] body = ea.Body.ToArray();
                 var message = Encoding.UTF8.GetString(body);
 
-                var data = JsonSerializer.Deserialize<QueueMessage>(message);
-                await HandleQueueTask(data);
+                if (ea.BasicProperties.Headers.TryGetValue("Action", out var actionObj))
+                {
+                    string action = Encoding.UTF8.GetString(actionObj as byte[]);
+                    await HandleQueueTask(action, message);
+                }
 
                 channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
             };
             channel.BasicConsume(queue: "Inventory_queue", autoAck: false, consumer: consumer);
         }
 
-        private class QueueMessage
+        private static async Task HandleQueueTask(string action, string bodyInString)
         {
-            public string Action { get; set; }
-            public CreateProductDTO Info { get; set; }
-        }
-
-        private static async Task HandleQueueTask(QueueMessage message)
-        {
-            var action = message.Action;
-            var info = message.Info;
             switch (action)
             {
                 case "CREATE":
-                    //var product = JsonSerializer.Deserialize<CreateProductDTO>(info.ToString());
-                    await _dbContext.AddAsync(
+                    CreateProductDTO newProduct = JsonSerializer.Deserialize<CreateProductDTO>(
+                        bodyInString
+                    );
+                    await _dbContext.Products.AddAsync(
                         new Product
                         {
-                            Name = info.Name,
-                            Description = info.Description,
-                            Price = info.Price,
-                            Postedby = info.PostedBy
+                            Name = newProduct.Name,
+                            Description = newProduct.Description,
+                            Price = newProduct.Price,
+                            Postedby = newProduct.PostedBy
                         }
                     );
                     await _dbContext.SaveChangesAsync();
                     break;
-                //case "UPDATE":
-                //    await UpdateProduct(object.Id);
-                //    break;
-                //case "DELETE":
-                //    await DeleteProduct(object.Id);
-                //    break;
+                case "UPDATE":
+                    UpdateProductDTO updateProduct = JsonSerializer.Deserialize<UpdateProductDTO>(
+                        bodyInString
+                    );
+                    Product productToUpdate = await _dbContext.Products.FindAsync(updateProduct.Id);
+                    if (
+                        productToUpdate != null
+                        && productToUpdate.Postedby == updateProduct.PostedBy
+                    ) //Wanted to make sure the user updating the product is the one who posted it
+                    {
+                        _dbContext
+                            .Products.Entry(productToUpdate)
+                            .CurrentValues.SetValues(updateProduct);
+                    }
+                    await _dbContext.SaveChangesAsync();
+                    break;
+                case "DELETE":
+                    DeleteProductDTO deleteProduct = JsonSerializer.Deserialize<DeleteProductDTO>(
+                        bodyInString
+                    );
+                    Product productToDelete = await _dbContext.Products.FindAsync(deleteProduct.Id);
+                    if (
+                        productToDelete != null
+                        && productToDelete.Postedby == deleteProduct.PostedBy
+                    )
+                    {
+                        _dbContext.Products.Remove(productToDelete);
+                    }
+                    await _dbContext.SaveChangesAsync();
+                    break;
             }
         }
     }
